@@ -1,0 +1,174 @@
+#include "Keypad.h"
+
+const int ledPin = 4;                        // define pin for the LED
+const int inputPin = 2;                       // input for PIR
+const int buttonPin = 3;                      // input pin for the button
+const int buzzerPin = 5;
+int dependant = 1;                      // dependant defining if an intruder is present or not
+int val, pressed, space, invalid_val, incorrect; 
+        
+const String code = "1234";
+String pass;
+String text_pass;
+
+String receive;
+
+const byte Rows = 4;
+const byte Cols = 4;
+char keypressed;
+char keymap[Rows][Cols] =
+{
+  {'1', '2', '3', 'A'}, 
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rPins[Rows] = {13, 12, 11, 10};
+byte cPins[Cols] = {9, 8, 7, 6};
+Keypad kpd = Keypad(makeKeymap(keymap), rPins, cPins, Rows, Cols);
+
+void setup(){
+  pinMode(ledPin, OUTPUT);              // declare LED as output
+  pinMode(inputPin, INPUT);             // declare sensor as input
+  pinMode(buttonPin, INPUT);            // declare button as input
+  pinMode(buzzerPin, OUTPUT);
+  Serial.begin(9600);
+}
+void loop() {
+  text_pass = "";
+  incorrect = 2;
+  pass = "";
+  invalid_val = 3;
+  pressed = LOW;                        // reset button state
+                           // reset alarm variable
+  Serial.println("Scanning for movement...");
+  delay(100);
+  Serial.println("3...");
+  delay(750);
+  Serial.println("2...");2;
+  delay(750);
+  Serial.println("1...");
+  delay(750);
+  for (space = 0; space < 3; space++) {  // Spacing of text in serial monitor
+    Serial.println("");
+  }
+  val = digitalRead(inputPin);
+  if (val == HIGH) {                         // if the PIR senses movement, proceed with code
+    Serial.println("Motion Detected...");
+    if (dependant == 1) {
+      Serial.println("INTRUDER ALERT!");
+      dependant = 0;
+      delay(500);
+    }
+    Serial.println("| RAISING ALARM |");
+    do {
+      pressed = LOW;
+      while (pressed == LOW) {   // while loop that initiates the alarm
+        digitalWrite(ledPin, LOW);
+        delay(150);
+        tone(buzzerPin, 100, 150);
+        digitalWrite(ledPin, HIGH);
+        delay(150);
+        pressed = digitalRead(buttonPin);
+      }
+      if (pressed == HIGH) {                    // if the pressed variable equals HIGH, stop the loop and print text
+        delay(100);
+        Serial.println();
+        Serial.println("| Enter Passcode |");
+        Serial.println();
+        delay(1000);
+        do {
+          digitalWrite(ledPin, LOW);
+          delay(75);
+          tone(buzzerPin, 100, 75);
+          digitalWrite(ledPin, HIGH);
+          delay(75);
+          keypressed = kpd.getKey();
+          if (keypressed != NO_KEY) {
+            Serial.print(keypressed);
+            pass += keypressed;
+            tone(buzzerPin, 500, 50);
+          }
+          if(Serial.available() > 0){
+            receive = Serial.read();
+          }
+          pressed = digitalRead(buttonPin);
+        } while (pressed == LOW);
+        if (pass == code || receive == code) {
+          tone(buzzerPin, 750, 750);
+          Serial.println();
+          Serial.println("| Correct Password |");
+          invalid_val = 0;
+          pass = "";
+          keypressed = 0;
+          digitalRead(buttonPin);
+        } else {
+          tone(buzzerPin, 50, 750);
+          invalid_val = 1;
+          Serial.println();
+          Serial.println("| INVALID PASSWORD |");
+          Serial.println("| REACTIVATING ALARM |");
+          pass = "";
+          text_pass = "";
+          delay(1000);
+          keypressed = 0;
+        }
+      }
+    } while (invalid_val == 1);
+  }
+  if (invalid_val == 0) {
+    digitalWrite(ledPin, LOW);
+    pressed = digitalRead(buttonPin);
+    Serial.println("| Press button to reactivate Intruder Alarm |");
+    delay(1000);
+    pressed = LOW;
+    while (pressed == LOW) {
+      delay(200);
+      pressed = digitalRead(buttonPin);
+    }
+    if (pressed == HIGH) {
+      do {
+        pass = "";
+        digitalWrite(ledPin, HIGH);
+        Serial.println("| Enter Password |");
+        delay(1000);
+        pressed = LOW;
+        while (pressed == LOW) {
+          pressed = digitalRead(buttonPin);
+          keypressed = kpd.getKey();
+          if (keypressed != NO_KEY) {
+            Serial.print(keypressed);
+            pass += keypressed;
+            tone(buzzerPin, 500, 50);
+          }
+          pressed = digitalRead(buttonPin);
+        }
+        if (pass == code) {
+          digitalWrite(ledPin, LOW);
+          tone(buzzerPin, 500, 150);
+          Serial.println("");
+          Serial.println("| Valid |");
+          delay(3000);
+          Serial.println("| Reactivating Intruder Alarm System |");
+          delay(3000);
+          incorrect = 0;
+        } else {
+          incorrect = 1;
+          tone(buzzerPin, 100, 150);
+          Serial.println("");
+          Serial.println("| INVALID |");
+          digitalWrite(ledPin, LOW);
+          delay(500);
+          digitalWrite(ledPin, HIGH);
+          delay(500);
+        }
+      } while (incorrect == 1);
+    }
+  }
+  if (val == LOW) {                     // if the PIR senses no movment, loop back to beginning
+    noTone(buzzerPin);
+    digitalWrite(ledPin, LOW);
+    Serial.println("No Motion Detected...");
+  }
+}
